@@ -33,8 +33,9 @@ import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 import nikoladasm.commons.configuration.properties.annotations.*;
@@ -52,6 +53,16 @@ public class PropertyLoader {
 	@FunctionalInterface
 	protected static interface elementValueAction<K> {
 		void doIt(K element, Object value);
+	}
+	
+	protected static class ObjectPropertyInfo<T> {
+		public T object;
+		public PropertyInfo info;
+		
+		public ObjectPropertyInfo(T object, PropertyInfo info) {
+			this.object = object;
+			this.info = info;
+		}
 	}
 	
 	protected Converters converters = new Converters();
@@ -204,18 +215,18 @@ public class PropertyLoader {
 			new PropertiesProxyHandler(propertyValues));
 	}
 	
-	protected <S> void populate(String context, String prefix, Map<S,PropertyInfo> propertyMap, Converters converters, elementValueAction<S> action) {
+	protected <S> void populate(String context, String prefix, List<ObjectPropertyInfo<S>> propertyList, Converters converters, elementValueAction<S> action) {
 		prefix = (prefix == null) ? "" : prefix+".";
 		PrepProperties sysProperties = 
 				new PrepProperties(System.getProperties());
-		for (Entry<S, PropertyInfo> propertyElement : propertyMap.entrySet()) {
-			PropertyInfo elementPropertyInfo = propertyElement.getValue();
+		for (ObjectPropertyInfo<S> propertyElement : propertyList) {
+			PropertyInfo elementPropertyInfo = propertyElement.info;
 			String elementContext = elementPropertyInfo.context();
 			Boolean elementRequired = elementPropertyInfo.required();
 			String elementComponentsDelimiter = elementPropertyInfo.componentsDelimiter();
 			String elementKeyValueDelimiter = elementPropertyInfo.keyValueDelimiter();
 			String elementContextPrefix = elementPropertyInfo.contextPrefix();
-			S element = propertyElement.getKey();
+			S element = propertyElement.object;
 			Object elementValue = null;
 			if (elementPropertyInfo.isChild()) {
 				Class<?> childClazz = elementPropertyInfo.type();
@@ -281,8 +292,8 @@ public class PropertyLoader {
 		return properties.getProperty(key);
 	}
 	
-	protected Map<Field,PropertyInfo> propertyFields(Class<?> clazz, Class<?> resourceClazz, PropertyInfo defaultInfo) {
-		Map<Field,PropertyInfo> fieldsMap = new HashMap<>();
+	protected List<ObjectPropertyInfo<Field>> propertyFields(Class<?> clazz, Class<?> resourceClazz, PropertyInfo defaultInfo) {
+		List<ObjectPropertyInfo<Field>> fieldsList = new LinkedList<>();
 		while (clazz != Object.class) {
 			Field[] fields = clazz.getDeclaredFields();
 			for (Field field : fields) {
@@ -290,29 +301,30 @@ public class PropertyLoader {
 				if (info != null) {
 					info.type(field.getType());
 					info.genericParameters(genericTypeToParameters(field.getGenericType()));
-					fieldsMap.put(field, info);
+					fieldsList.add(new ObjectPropertyInfo<>(field, info));
 				}
 			}
 			clazz = clazz.getSuperclass();
 		}
-		return fieldsMap;
+		return fieldsList;
 	}
 	
-	protected Map<Method,PropertyInfo> propertyMethods(Class<?> clazz, Class<?> resourceClazz, ValueTypeSource valueTypeSource, PropertyInfo defaultInfo) {
-		Map<Method,PropertyInfo> methodsMap = new HashMap<>();
+	protected List<ObjectPropertyInfo<Method>> propertyMethods(Class<?> clazz, Class<?> resourceClazz, ValueTypeSource valueTypeSource, PropertyInfo defaultInfo) {
+		List<ObjectPropertyInfo<Method>> methodsList = new LinkedList<>();
 		Method[] methods = clazz.getMethods();
-			for (Method method : methods) {
-				PropertyInfo info = fieldAndMethodPropertyInfo(method, resourceClazz, defaultInfo);
-				if (info == null) continue;
-				info = populateMethodType(method, info, valueTypeSource);
-				if (info == null) continue;
-				methodsMap.put(method, info);
-			}
-		return methodsMap;
+		for (Method method : methods) {
+			PropertyInfo info = fieldAndMethodPropertyInfo(method, resourceClazz, defaultInfo);
+			if (info == null) continue;
+			info = populateMethodType(method, info, valueTypeSource);
+			if (info == null) continue;
+			methodsList.add(new ObjectPropertyInfo<>(method, info));
+		}
+		methodsList.sort((pInfo1, pInfo2) -> Integer.compare(pInfo1.info.priority(), pInfo2.info.priority()));
+		return methodsList;
 	}
 
-	protected Map<String,PropertyInfo> propertyEntries(Class<?> clazz, Class<?> resourceClazz, PropertyInfo defaultInfo) {
-		Map<String,PropertyInfo> entryMap = new HashMap<>();
+	protected List<ObjectPropertyInfo<String>> propertyEntries(Class<?> clazz, Class<?> resourceClazz, PropertyInfo defaultInfo) {
+		List<ObjectPropertyInfo<String>> entryList = new LinkedList<>();
 		PropertiesEntry[] entries = clazz.getAnnotationsByType(PropertiesEntry.class);
 		for (PropertiesEntry entry : entries) {
 			PropertyInfo info = new PropertyInfo(defaultInfo);
@@ -341,9 +353,9 @@ public class PropertyLoader {
 				info.required("true".equals(required));
 			info.properies(orderedProperies(entry.resources(), resourceClazz, info));
 			info.type(String.class);
-			entryMap.put(alias, info);
+			entryList.add(new ObjectPropertyInfo<>(alias, info));
 		}
-		return entryMap;
+		return entryList;
 	}
 	
 	protected PropertyInfo populateMethodType(Method method, PropertyInfo info, ValueTypeSource valueTypeSource) {
@@ -404,6 +416,8 @@ public class PropertyLoader {
 				info.includeKey(element.getAnnotation(IncludeKey.class).value());
 			if (element.isAnnotationPresent(IncludesDelimiter.class))
 				info.includesDelimiter(element.getAnnotation(IncludesDelimiter.class).value());
+			if (element.isAnnotationPresent(MethodPriority.class))
+				info.priority(element.getAnnotation(MethodPriority.class).value());
 			info.properies(orderedProperies(element.getAnnotationsByType(Resource.class), resourceClazz, info));
 		} else {
 			return null;

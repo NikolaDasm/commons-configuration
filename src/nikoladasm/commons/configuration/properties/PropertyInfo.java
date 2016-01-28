@@ -18,6 +18,7 @@
 
 package nikoladasm.commons.configuration.properties;
 
+import nikoladasm.commons.configuration.properties.annotations.MethodPriority;
 import nikoladasm.commons.configuration.properties.converters.Converter;
 import nikoladasm.commons.configuration.properties.extproperties.PrepProperties;
 
@@ -37,6 +38,7 @@ public class PropertyInfo {
 	private String includeKey;
 	private String includesDelimiter;
 	private PropertyInfo parentInfo;
+	private int priority = MethodPriority.DEFAULT_PRIORITY;
 	
 	public PropertyInfo() {
 	}
@@ -167,5 +169,13 @@ public class PropertyInfo {
 	
 	public String includesDelimiter() {
 		return includesDelimiter;
+	}
+
+	public void priority(int priority) {
+		this.priority = priority;
+	}
+	
+	public int priority() {
+		return priority;
 	}
 }

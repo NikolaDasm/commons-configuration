@@ -224,6 +224,29 @@ public class PropertyLoaderUnitTest {
 		private static final long serialVersionUID = 1L;
 	}
 
+	public static class ConfigClass13 {
+		
+		public String result="";
+		
+		@Property("value51")
+		@MethodPriority(MethodPriority.DEFAULT_PRIORITY)
+		public void value51(String value){
+			result += value;
+		};
+
+		@Property("value52")
+		@MethodPriority(MethodPriority.DEFAULT_PRIORITY+1)
+		public void value52(String value){
+			result += value;
+		};
+
+		@Property("value53")
+		@MethodPriority(MethodPriority.DEFAULT_PRIORITY-1)
+		public void value53(String value){
+			result += value;
+		};
+	}
+	
 	public static class CustomClass {
 		private int value;
 		public CustomClass(int value) {
@@ -332,6 +355,7 @@ public class PropertyLoaderUnitTest {
 	private ConfigClass9 conf9;
 	private ConfigClass10 conf10;
 	private ConfigClass12 conf12;
+	private ConfigClass13 conf13;
 	
 	@Before
 	public void init() {
@@ -347,6 +371,7 @@ public class PropertyLoaderUnitTest {
 		conf9 = new ConfigClass9();
 		conf10 = new ConfigClass10();
 		conf12 = new ConfigClass12();
+		conf13 = new ConfigClass13();
 	}
 	
 	@Test
@@ -617,4 +642,14 @@ public class PropertyLoaderUnitTest {
 		assertThat(conf12.getProperty("child3.key2"), is(equalTo("child3.value2")));
 	}
 
+	@Test
+	public void shouldBeGetValueWithCorrectOrderindMethodCall() {
+		System.getProperties().setProperty("value51", "A");
+		System.getProperties().setProperty("value52", "B");
+		System.getProperties().setProperty("value53", "C");
+		PropertyLoader.getInstance().populate(null, conf13);
+		assertThat(conf13.result, is(equalTo("CAB")));
+	}
+	
+	
 }
