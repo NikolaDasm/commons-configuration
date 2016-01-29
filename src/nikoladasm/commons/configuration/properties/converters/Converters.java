@@ -101,33 +101,38 @@ public class Converters {
 			this.keyValueDelimiter : keyValueDelimiter;
 		if (clazz.isArray()) {
 			Class<?> componentType = clazz.getComponentType();
-			Converter<?> childConverter = nonGenericTypeConverters.get(componentType);
+			Converter<?> childConverter = simpleConverter(componentType, componentsDelimiter, keyValueDelimiter);
 			if (childConverter == null) return null;
 			return (Converter<T>) arrayConverter(componentType, childConverter, componentsDelimiter);
 		}
-		if (clazz.isEnum()) {
-			return (Converter<T>) enumConverter((Class<? extends Enum<?>>) clazz);
-		}
-		Converter<T> converter = (Converter<T>) nonGenericTypeConverters.get(clazz);
+		Converter<T> converter = simpleConverter(clazz, componentsDelimiter, keyValueDelimiter);
 		if (converter != null) return converter;
 		if (genericParameters == null) return null;
 		genericConverterBuilder converterBuilder = oneTypeParameterGenericConvertersBuilders.get(clazz);
 		if (converterBuilder != null && genericParameters.length == 1) {
-			Converter<?> childConverter = nonGenericTypeConverters.get(genericParameters[0]);
+			Converter<?> childConverter = simpleConverter(genericParameters[0], componentsDelimiter, keyValueDelimiter);
 			if (childConverter == null) return null;
 			return (Converter<T>) converterBuilder.build(new Converter<?>[]{childConverter}, new String[]{componentsDelimiter});
 		}
 		converterBuilder = twoTypeParametersGenericConvertersBuilders.get(clazz);
 		if (converterBuilder != null && genericParameters.length == 2) {
-			Converter<?> firstChildConverter = nonGenericTypeConverters.get(genericParameters[0]);
+			Converter<?> firstChildConverter = simpleConverter(genericParameters[0], componentsDelimiter, keyValueDelimiter);
 			if (firstChildConverter == null) return null;
-			Converter<?> secondChildConverter = nonGenericTypeConverters.get(genericParameters[1]);
+			Converter<?> secondChildConverter = simpleConverter(genericParameters[1], componentsDelimiter, keyValueDelimiter);
 			if (secondChildConverter == null) return null;
 			return (Converter<T>) converterBuilder.build(new Converter<?>[]{firstChildConverter, secondChildConverter}, new String[]{componentsDelimiter, keyValueDelimiter});
 		}
 		return converter;
 	}
 
+	@SuppressWarnings("unchecked")
+	protected <T> Converter<T> simpleConverter(Class<?> clazz, String componentsDelimiter, String keyValueDelimiter) {
+		if (clazz.isEnum()) {
+			return (Converter<T>) enumConverter((Class<? extends Enum<?>>) clazz);
+		}
+		return (Converter<T>) nonGenericTypeConverters.get(clazz);
+	}
+	
 	protected void init() {
 		nonGenericTypeConverters.put(Byte.class, byteConverter());
 		nonGenericTypeConverters.put(Short.class, shortConverter());
